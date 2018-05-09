@@ -1,0 +1,6 @@
+[package]
+name = "rust_webserver_example"
+version = "0.1.0"
+authors = ["Jacob Killelea <Jkillelea@protonmail.ch>"]
+
+[dependencies]

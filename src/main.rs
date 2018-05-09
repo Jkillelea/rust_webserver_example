@@ -33,24 +33,23 @@ fn handle(mut stream: TcpStream) {
 
     // parse request types
     let (status, filename) = if buf.starts_with(get) {
-        ("HTTP/1.1 200 OK\r\n\r\n", PathBuf::from(WEBROOT).join("hello.html"))
+        ("HTTP/1.1 200 OK\r\n\r\n", webroot("hello.html"))
     } else if buf.starts_with(sleep) {
         thread::sleep(Duration::from_secs(5)); // wait for a bit
-        ("HTTP/1.1 200 OK\r\n\r\n", PathBuf::from(WEBROOT).join("hello.html"))
+        ("HTTP/1.1 200 OK\r\n\r\n", webroot("hello.html"))
     } else { // look for file
-        // ("HTTP/1.1 404 NOT FOUND\r\n\r\n", PathBuf::from("404.html"))
         let request_path = String::from_utf8_lossy(&buf);
-        println!("request for {}", request_path.split_whitespace().nth(1).unwrap_or("[Error]"));
-        let p = find_file(&request_path);
-        
-        if let Some(p) = p {
+        println!("request for {}", request_path.split_whitespace().nth(1).unwrap_or("[Error] Bad HTTP request"));
+
+        // let p = find_file(&request_path);
+        if let Some(p) = find_file(&request_path) {
             if p.is_file() {
                 ("HTTP/1.1 200 OK\r\n\r\n", p)
             } else {
-                ("HTTP/1.1 404 NOT FOUND\r\n\r\n", PathBuf::from(WEBROOT).join("404.html"))
+                ("HTTP/1.1 404 NOT FOUND\r\n\r\n", webroot("404.html"))
             }
         } else {
-            ("HTTP/1.1 404 NOT FOUND\r\n\r\n", PathBuf::from(WEBROOT).join("404.html"))
+            ("HTTP/1.1 404 NOT FOUND\r\n\r\n", webroot("404.html"))
         }
     };
 
@@ -82,4 +81,8 @@ fn find_file(request: &str) -> Option<PathBuf> {
     } else {
         return Some(path.unwrap())
     }
+}
+
+fn webroot<P: AsRef<Path>>(path: P) -> PathBuf {
+    PathBuf::from(WEBROOT).join(path)
 }

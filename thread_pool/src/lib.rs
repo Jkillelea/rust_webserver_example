@@ -6,16 +6,48 @@ use std::sync::mpsc;
 /// A threadsafe, heap allocated closure
 type Job = Box<FnBox + Send + 'static>;
 
-/// Possible message types; Execute a job or die
+/// Possible message types: execute a job or die
 enum Message {
     NewJob(Job),
     Terminate,
+}
+
+/// Makes a heap allocated closure callable
+trait FnBox {
+    fn call_box(self: Box<Self>);
+}
+
+impl<F: FnOnce()> FnBox for F {
+    fn call_box(self: Box<F>) {
+        (*self)()
+    }
 }
 
 /// A thread worker
 struct Worker {
     id: usize,
     thread: Option<thread::JoinHandle<()>>,
+}
+
+impl Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
+        let thread = thread::spawn(move || {
+            loop {
+                let message = receiver.lock().unwrap().recv().unwrap();
+                match message {
+                    Message::NewJob(job) => {
+                        println!("Worker {} got a job", id);
+                        job.call_box();
+                    },
+                    Message::Terminate => {
+                        println!("Worker {} is terminating", id);
+                        break
+                    },
+                }
+            }
+        });
+        Worker { id: id, thread: Some(thread) }   
+    }
 }
 
 /// The ThreadPool, handles starting and stopping workers, as well as
@@ -25,22 +57,10 @@ pub struct ThreadPool {
     sender: mpsc::Sender<Message>,
 }
 
-/// Makes a heap allocated closure callable
-trait FnBox {
-    fn call_box(self: Box<Self>);
-}
-impl<F: FnOnce()> FnBox for F {
-    fn call_box(self: Box<F>) {
-        (*self)()
-    }
-}
-
 impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
-        assert!(size > 0);
         let (sender, receiver) = mpsc::channel();
         let mut workers = Vec::with_capacity(size);
-
         let receiver = Arc::new(Mutex::new(receiver));
 
         for id in 0..size {
@@ -78,27 +98,5 @@ impl Drop for ThreadPool {
                 thread.join().unwrap()
             }
         }
-    }
-}
-
-
-impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
-        let thread = thread::spawn(move || {
-            loop {
-                let message = receiver.lock().unwrap().recv().unwrap();
-                match message {
-                    Message::NewJob(job) => {
-                        println!("Worker {} got a job", id);
-                        job.call_box();
-                    },
-                    Message::Terminate => {
-                        println!("Worker {} is terminating", id);
-                        break
-                    },
-                }
-            }
-        });
-        Worker { id: id, thread: Some(thread) }   
     }
 }

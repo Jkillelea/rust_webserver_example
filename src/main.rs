@@ -10,9 +10,10 @@ use std::fs::File;
 use std::net::{TcpListener, TcpStream};
 
 const WEBROOT: &'static str = "./webroot";
+const ADDR:    &'static str = "0.0.0.0:8080";
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let listener = TcpListener::bind(ADDR).unwrap();
     let pool = ThreadPool::new(2);
 
     for stream in listener.incoming() {
@@ -34,9 +35,11 @@ fn handle(mut stream: TcpStream) {
     // parse request types
     let (status, filename) = if buf.starts_with(get) {
         ("HTTP/1.1 200 OK\r\n\r\n", webroot("hello.html"))
+
     } else if buf.starts_with(sleep) {
         thread::sleep(Duration::from_secs(5)); // wait for a bit
         ("HTTP/1.1 200 OK\r\n\r\n", webroot("hello.html"))
+
     } else { // look for file
         let request_path = String::from_utf8_lossy(&buf);
         println!("request for {}", request_path.split_whitespace().nth(1).unwrap_or("[Error] Bad HTTP request"));
@@ -86,3 +89,4 @@ fn find_file(request: &str) -> Option<PathBuf> {
 fn webroot<P: AsRef<Path>>(path: P) -> PathBuf {
     PathBuf::from(WEBROOT).join(path)
 }
+
